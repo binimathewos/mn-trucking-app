@@ -1,0 +1,78 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum UserRole {
+  ADMINISTRATOR
+  DRIVER
+}
+
+/// Any signed-in person, linked to their Clerk identity. Administrators and
+/// Drivers are both represented here because an administrator's own logged
+/// hours can appear in the driver submissions table (spec Assumptions).
+model User {
+  id          String   @id @default(cuid())
+  clerkUserId String   @unique
+  name        String
+  email       String?  @unique
+  role        UserRole
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  driver     Driver?
+  timesheets Timesheet[]
+}
+
+/// Driver-specific profile data, one-to-one with a DRIVER-role User.
+/// Deliberately minimal: only what this feature's table needs to display
+/// (spec Key Entities: Driver.roleType) plus the truck assignment every
+/// driver has (business rule: every driver has a truck assigned to them).
+/// Not created for ADMINISTRATOR users.
+model Driver {
+  id          String   @id @default(cuid())
+  userId      String   @unique
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  roleType    String
+  truckNumber String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+/// One user's time record for one Monday-start week. totalHours, status, and
+/// lastSubmittedAt are intentionally NOT columns here — they're derived at
+/// read time from `entries` by lib/calculations.ts (research.md #5), so they
+/// can never drift out of sync with the entries they summarize.
+model Timesheet {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  weekStart DateTime @db.Date
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  entries TimesheetEntry[]
+
+  @@unique([userId, weekStart])
+}
+
+/// One day's logged time within a Timesheet (spec Key Entities: Daily Entry).
+/// `hours` is computed from startTime/endTime once, at save time, and stored
+/// — it is not recomputed from the strings on every read (data-model.md
+/// keeps a record's historical hours stable even if the computation rule
+/// ever changes later).
+model TimesheetEntry {
+  id          String    @id @default(cuid())
+  timesheetId String
+  timesheet   Timesheet @relation(fields: [timesheetId], references: [id], onDelete: Cascade)
+  date        DateTime  @db.Date
+  startTime   String
+  endTime     String
+  hours       Float
+  savedAt     DateTime  @default(now())
+
+  @@unique([timesheetId, date])
+}
