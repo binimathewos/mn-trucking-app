@@ -66,8 +66,8 @@ export default async function SignInPage() {
         </div>
 
         <div className="relative space-y-8">
-          <h1 className="text-3xl leading-tight font-bold text-balance">
-            Run your fleet with clarity, every mile of the way.
+          <h1 className="text-5xl leading-tight font-bold text-balance">
+            Every mile, managed.
           </h1>
           <p className="max-w-md text-sm leading-relaxed text-slate-300">
             One place for dispatch, drivers, and reporting — built for MN
