@@ -79,3 +79,13 @@ export async function getDriverDirectory(
 
   return { stats, drivers: rows };
 }
+
+export async function getActiveDriversForSelect(): Promise<{ id: string; name: string }[]> {
+  const drivers = await prisma.driver.findMany({
+    where: { status: "ACTIVE", user: { role: "DRIVER" } },
+    include: { user: true },
+    orderBy: { user: { name: "asc" } },
+  });
+
+  return drivers.map((driver) => ({ id: driver.id, name: driver.user.name }));
+}

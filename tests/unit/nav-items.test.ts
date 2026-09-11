@@ -11,6 +11,7 @@ describe("getNavItemsForRole", () => {
       "Dashboard",
       "Timesheets",
       "Containers",
+      "Routes",
       "Drivers",
       "Reports",
       "Settings",

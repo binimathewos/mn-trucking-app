@@ -17,6 +17,19 @@ enum DriverStatus {
   ON_LEAVE
 }
 
+enum ClientStatus {
+  ACTIVE
+  INACTIVE
+}
+
+enum RouteStatus {
+  SCHEDULED
+  ASSIGNED
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
 /// Any signed-in person, linked to their Clerk identity. Administrators and
 /// Drivers are both represented here because an administrator's own logged
 /// hours can appear in the driver submissions table (spec Assumptions).
@@ -48,6 +61,50 @@ model Driver {
   status      DriverStatus @default(ACTIVE)
   createdAt   DateTime     @default(now())
   updatedAt   DateTime     @updatedAt
+
+  routes Route[]
+}
+
+/// A reusable customer/company that routes are created for (spec Key
+/// Entities: Client). Never hard-deleted — deactivation only (FR-032).
+model Client {
+  id          String       @id @default(cuid())
+  companyName String
+  contactName String
+  phone       String
+  email       String
+  address     String
+  status      ClientStatus @default(ACTIVE)
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  routes Route[]
+}
+
+/// A delivery/transport job (spec Key Entities: Route). Truck information is
+/// deliberately NOT a column here — always read live via `driver.truckNumber`
+/// (research.md #6, FR-013, FR-040) so it can never drift out of sync.
+model Route {
+  id              String      @id @default(cuid())
+  sequenceNumber  Int         @unique @default(autoincrement())
+  clientId        String
+  client          Client      @relation(fields: [clientId], references: [id])
+  driverId        String?
+  driver          Driver?     @relation(fields: [driverId], references: [id])
+  pickupAddress   String
+  deliveryAddress String
+  pickupAt        DateTime
+  deliveryAt      DateTime?
+  referenceNumber String?
+  notes           String?
+  status          RouteStatus @default(SCHEDULED)
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+
+  @@index([driverId])
+  @@index([clientId])
+  @@index([status])
+  @@index([pickupAt])
 }
 
 /// One user's time record for one Monday-start week. totalHours, status, and

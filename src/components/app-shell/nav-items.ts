@@ -5,6 +5,7 @@ import {
   Package,
   Settings,
   Users,
+  Waypoints,
   type LucideIcon,
 } from "lucide-react";
 import type { SessionRole } from "@/lib/auth/route-access";
@@ -33,6 +34,12 @@ export const navItems: NavItem[] = [
     label: "Containers",
     href: "/containers",
     icon: Package,
+    roles: ["administrator"],
+  },
+  {
+    label: "Routes",
+    href: "/routes",
+    icon: Waypoints,
     roles: ["administrator"],
   },
   {

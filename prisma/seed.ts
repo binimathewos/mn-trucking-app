@@ -8,7 +8,7 @@
  * don't have real Clerk accounts in a dev environment (research.md #2, #8).
  */
 import { PrismaPg } from "@prisma/adapter-pg";
-import { DriverStatus, PrismaClient, UserRole } from "@prisma/client";
+import { ClientStatus, DriverStatus, PrismaClient, RouteStatus, UserRole } from "@prisma/client";
 
 const adapter = new PrismaPg({ connectionString: process.env.DATABASE_URL });
 const prisma = new PrismaClient({ adapter });
@@ -91,7 +91,45 @@ async function seedTimesheet(userId: string, weekStart: Date, entries: DailyEntr
   }
 }
 
+interface ClientSeed {
+  companyName: string;
+  contactName: string;
+  phone: string;
+  email: string;
+  address: string;
+  status: ClientStatus;
+}
+
+const CLIENTS: ClientSeed[] = [
+  {
+    companyName: "Acme Logistics",
+    contactName: "Jamie Lee",
+    phone: "(612) 555-0110",
+    email: "jamie@acmelogistics.test",
+    address: "500 Industrial Blvd, Minneapolis, MN",
+    status: ClientStatus.ACTIVE,
+  },
+  {
+    companyName: "Northland Freight Co.",
+    contactName: "Pat Rourke",
+    phone: "(651) 555-0134",
+    email: "pat@northlandfreight.test",
+    address: "88 Harbor Ave, St. Paul, MN",
+    status: ClientStatus.ACTIVE,
+  },
+  {
+    companyName: "Twin Cities Retailers",
+    contactName: "Morgan Ito",
+    phone: "(763) 555-0156",
+    email: "morgan@tcretailers.test",
+    address: "1200 Commerce Dr, Bloomington, MN",
+    status: ClientStatus.INACTIVE,
+  },
+];
+
 async function main() {
+  await prisma.route.deleteMany();
+  await prisma.client.deleteMany();
   await prisma.timesheetEntry.deleteMany();
   await prisma.timesheet.deleteMany();
   await prisma.driver.deleteMany();
@@ -151,8 +189,72 @@ async function main() {
   await seedTimesheet(marcus.id, twoWeeksAgoStart, FULL_WEEK);
   await seedTimesheet(dale.id, twoWeeksAgoStart, FULL_WEEK.slice(0, 4));
 
+  const [acme, northland, twinCities] = await Promise.all(
+    CLIENTS.map((client) => prisma.client.create({ data: client })),
+  );
+
+  const marcusDriverId = await prisma.driver
+    .findUniqueOrThrow({ where: { userId: marcus.id } })
+    .then((driver) => driver.id);
+  const samDriverId = await prisma.driver
+    .findUniqueOrThrow({ where: { userId: sam.id } })
+    .then((driver) => driver.id);
+
+  await prisma.route.create({
+    data: {
+      clientId: acme.id,
+      pickupAddress: "500 Industrial Blvd, Minneapolis, MN",
+      deliveryAddress: "10 Warehouse Way, Eagan, MN",
+      pickupAt: addDays(thisWeekStart, 1),
+      status: RouteStatus.SCHEDULED,
+    },
+  });
+  await prisma.route.create({
+    data: {
+      clientId: northland.id,
+      driverId: marcusDriverId,
+      pickupAddress: "88 Harbor Ave, St. Paul, MN",
+      deliveryAddress: "400 Port Rd, Duluth, MN",
+      pickupAt: addDays(thisWeekStart, 2),
+      deliveryAt: addDays(thisWeekStart, 3),
+      referenceNumber: "PO-4821",
+      status: RouteStatus.ASSIGNED,
+    },
+  });
+  await prisma.route.create({
+    data: {
+      clientId: acme.id,
+      driverId: samDriverId,
+      pickupAddress: "500 Industrial Blvd, Minneapolis, MN",
+      deliveryAddress: "22 Depot St, Rochester, MN",
+      pickupAt: addDays(thisWeekStart, -2),
+      deliveryAt: addDays(thisWeekStart, -1),
+      status: RouteStatus.IN_PROGRESS,
+    },
+  });
+  await prisma.route.create({
+    data: {
+      clientId: twinCities.id,
+      driverId: samDriverId,
+      pickupAddress: "1200 Commerce Dr, Bloomington, MN",
+      deliveryAddress: "77 Market St, Mankato, MN",
+      pickupAt: addDays(thisWeekStart, -7),
+      deliveryAt: addDays(thisWeekStart, -6),
+      status: RouteStatus.COMPLETED,
+    },
+  });
+  await prisma.route.create({
+    data: {
+      clientId: northland.id,
+      pickupAddress: "88 Harbor Ave, St. Paul, MN",
+      deliveryAddress: "5 Lakeview Dr, Brainerd, MN",
+      pickupAt: addDays(thisWeekStart, -3),
+      status: RouteStatus.CANCELLED,
+    },
+  });
+
   console.log(
-    `Seeded ${DRIVERS.length + 1} users (1 administrator, ${DRIVERS.length} drivers) with timesheet history across 3 weeks.`,
+    `Seeded ${DRIVERS.length + 1} users (1 administrator, ${DRIVERS.length} drivers) with timesheet history across 3 weeks, ${CLIENTS.length} clients, and 5 routes.`,
   );
 }
 
