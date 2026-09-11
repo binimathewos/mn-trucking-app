@@ -8,7 +8,7 @@
  * don't have real Clerk accounts in a dev environment (research.md #2, #8).
  */
 import { PrismaPg } from "@prisma/adapter-pg";
-import { PrismaClient, UserRole } from "@prisma/client";
+import { DriverStatus, PrismaClient, UserRole } from "@prisma/client";
 
 const adapter = new PrismaPg({ connectionString: process.env.DATABASE_URL });
 const prisma = new PrismaClient({ adapter });
@@ -43,16 +43,18 @@ interface DriverSeed {
   slug: string;
   name: string;
   roleType: string;
-  truckNumber: string;
+  phone: string;
+  truckNumber: string | null;
+  status: DriverStatus;
 }
 
 const DRIVERS: DriverSeed[] = [
-  { slug: "marcus-johnson", name: "Marcus Johnson", roleType: "Class A Driver", truckNumber: "Truck 12" },
-  { slug: "sam-wilson", name: "Sam Wilson", roleType: "Class A Driver", truckNumber: "Truck 07" },
-  { slug: "elena-ruiz", name: "Elena Ruiz", roleType: "Class B Driver", truckNumber: "Truck 03" },
-  { slug: "tyler-brandt", name: "Tyler Brandt", roleType: "Class A Driver", truckNumber: "Truck 09" },
-  { slug: "priya-nair", name: "Priya Nair", roleType: "Class B Driver", truckNumber: "Truck 15" },
-  { slug: "dale-kowalski", name: "Dale Kowalski", roleType: "Class A Driver", truckNumber: "Truck 21" },
+  { slug: "marcus-johnson", name: "Marcus Johnson", roleType: "Class A Driver", phone: "(651) 555-0127", truckNumber: "Truck 12", status: DriverStatus.ACTIVE },
+  { slug: "sam-wilson", name: "Sam Wilson", roleType: "Class A Driver", phone: "(763) 555-0198", truckNumber: "Truck 07", status: DriverStatus.ACTIVE },
+  { slug: "elena-ruiz", name: "Elena Ruiz", roleType: "Class B Driver", phone: "(612) 555-0142", truckNumber: "Truck 03", status: DriverStatus.ACTIVE },
+  { slug: "tyler-brandt", name: "Tyler Brandt", roleType: "Class A Driver", phone: "(612) 555-0176", truckNumber: "Truck 09", status: DriverStatus.ON_LEAVE },
+  { slug: "priya-nair", name: "Priya Nair", roleType: "Class B Driver", phone: "(651) 555-0163", truckNumber: "Truck 15", status: DriverStatus.ACTIVE },
+  { slug: "dale-kowalski", name: "Dale Kowalski", roleType: "Class A Driver", phone: "(763) 555-0184", truckNumber: null, status: DriverStatus.INACTIVE },
 ];
 
 interface DailyEntrySeed {
@@ -123,7 +125,9 @@ async function main() {
             data: {
               userId: user.id,
               roleType: driver.roleType,
+              phone: driver.phone,
               truckNumber: driver.truckNumber,
+              status: driver.status,
             },
           }).then(() => user),
         ),

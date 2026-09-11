@@ -62,7 +62,7 @@ function toRoleType(user: { role: string; driver: { roleType: string } | null })
   return user.role === "ADMINISTRATOR" ? "Administrator" : (user.driver?.roleType ?? "");
 }
 
-function toTruckNumber(user: { role: string; driver: { truckNumber: string } | null }): string | null {
+function toTruckNumber(user: { role: string; driver: { truckNumber: string | null } | null }): string | null {
   return user.role === "DRIVER" ? (user.driver?.truckNumber ?? null) : null;
 }
 

@@ -11,6 +11,12 @@ enum UserRole {
   DRIVER
 }
 
+enum DriverStatus {
+  ACTIVE
+  INACTIVE
+  ON_LEAVE
+}
+
 /// Any signed-in person, linked to their Clerk identity. Administrators and
 /// Drivers are both represented here because an administrator's own logged
 /// hours can appear in the driver submissions table (spec Assumptions).
@@ -33,13 +39,15 @@ model User {
 /// driver has (business rule: every driver has a truck assigned to them).
 /// Not created for ADMINISTRATOR users.
 model Driver {
-  id          String   @id @default(cuid())
-  userId      String   @unique
-  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id          String       @id @default(cuid())
+  userId      String       @unique
+  user        User         @relation(fields: [userId], references: [id], onDelete: Cascade)
   roleType    String
-  truckNumber String
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  phone       String?
+  truckNumber String?
+  status      DriverStatus @default(ACTIVE)
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
 }
 
 /// One user's time record for one Monday-start week. totalHours, status, and
