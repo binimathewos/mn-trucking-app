@@ -30,6 +30,12 @@ enum RouteStatus {
   CANCELLED
 }
 
+enum NonDrivingReason {
+  NO_JOB
+  DAY_OFF
+  OTHER
+}
+
 /// Any signed-in person, linked to their Clerk identity. Administrators and
 /// Drivers are both represented here because an administrator's own logged
 /// hours can appear in the driver submissions table (spec Assumptions).
@@ -98,13 +104,25 @@ model Route {
   referenceNumber String?
   notes           String?
   status          RouteStatus @default(SCHEDULED)
+  hourlyRate      Decimal     @default(0) @db.Decimal(10, 2)
   createdAt       DateTime    @default(now())
   updatedAt       DateTime    @updatedAt
+
+  timesheetEntries TimesheetEntry[]
 
   @@index([driverId])
   @@index([clientId])
   @@index([status])
   @@index([pickupAt])
+}
+
+/// System-wide default hourly rate a newly created Route's hourlyRate is
+/// prepopulated with (spec FR-007). Single fixed-id row — not a per-driver or
+/// per-tenant setting (research.md #7).
+model DriverPaySettings {
+  id                String   @id @default("default")
+  defaultHourlyRate Decimal  @default(0) @db.Decimal(10, 2)
+  updatedAt         DateTime @updatedAt
 }
 
 /// One user's time record for one Monday-start week. totalHours, status, and
@@ -119,9 +137,25 @@ model Timesheet {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  entries TimesheetEntry[]
+  entries        TimesheetEntry[]
+  nonDrivingDays NonDrivingDay[]
 
   @@unique([userId, weekStart])
+}
+
+/// A day within a Timesheet explicitly marked as not driving (no route, no
+/// hours) — distinct from a TimesheetEntry so a day can never carry both at
+/// once (enforced in the repository, not just here) and so weekly reports
+/// can tell "intentionally not driving" apart from "missing entry".
+model NonDrivingDay {
+  id          String           @id @default(cuid())
+  timesheetId String
+  timesheet   Timesheet        @relation(fields: [timesheetId], references: [id], onDelete: Cascade)
+  date        DateTime         @db.Date
+  reason      NonDrivingReason
+  savedAt     DateTime         @default(now())
+
+  @@unique([timesheetId, date])
 }
 
 /// One day's logged time within a Timesheet (spec Key Entities: Daily Entry).
@@ -137,6 +171,8 @@ model TimesheetEntry {
   startTime   String
   endTime     String
   hours       Float
+  routeId     String?
+  route       Route?    @relation(fields: [routeId], references: [id], onDelete: SetNull)
   savedAt     DateTime  @default(now())
 
   @@unique([timesheetId, date])

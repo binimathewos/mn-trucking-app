@@ -20,6 +20,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import type { AssignedRouteOption } from "@/features/routes/types";
 import { StatusBadge } from "@/features/timesheets/components/status-badge";
 import { DriverTimesheetDetailDialog } from "@/features/timesheets/components/driver-timesheet-detail-dialog";
 import { deleteTimesheetAction } from "@/features/timesheets/actions/timesheet-actions";
@@ -69,9 +70,10 @@ interface RowActionsProps {
   row: DriverSubmissionRow;
   weekStart: string;
   drivers: Driver[];
+  routesByDriverId: Record<string, AssignedRouteOption[]>;
 }
 
-function RowActions({ row, weekStart, drivers }: RowActionsProps) {
+function RowActions({ row, weekStart, drivers, routesByDriverId }: RowActionsProps) {
   const router = useRouter();
   const [detailOpen, setDetailOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -127,6 +129,7 @@ function RowActions({ row, weekStart, drivers }: RowActionsProps) {
         row={row}
         weekStart={weekStart}
         drivers={drivers}
+        routesByDriverId={routesByDriverId}
         open={detailOpen}
         onOpenChange={setDetailOpen}
       />
@@ -138,12 +141,14 @@ interface DriverSubmissionsTableProps {
   rows: DriverSubmissionRow[];
   weekStart: string;
   drivers: Driver[];
+  routesByDriverId: Record<string, AssignedRouteOption[]>;
 }
 
 export function DriverSubmissionsTable({
   rows,
   weekStart,
   drivers,
+  routesByDriverId,
 }: DriverSubmissionsTableProps) {
   if (rows.length === 0) {
     return (
@@ -196,7 +201,7 @@ export function DriverSubmissionsTable({
               <StatusBadge status={row.status} />
             </TableCell>
             <TableCell>
-              <RowActions row={row} weekStart={weekStart} drivers={drivers} />
+              <RowActions row={row} weekStart={weekStart} drivers={drivers} routesByDriverId={routesByDriverId} />
             </TableCell>
           </TableRow>
         ))}

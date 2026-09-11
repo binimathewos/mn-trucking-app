@@ -1,7 +1,7 @@
 import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db/prisma";
 import { formatRouteNumber } from "@/features/routes/lib/route-number";
-import type { RouteDirectoryFilters, RouteRow } from "@/features/routes/types";
+import type { AssignedRouteOption, RouteDirectoryFilters, RouteRow } from "@/features/routes/types";
 import type { SessionRole } from "@/lib/auth/route-access";
 
 const routeWithRelations = {
@@ -26,6 +26,7 @@ function toRouteRow(route: RouteWithRelations): RouteRow {
     referenceNumber: route.referenceNumber,
     notes: route.notes,
     status: route.status,
+    hourlyRate: route.hourlyRate.toFixed(2),
   };
 }
 
@@ -89,6 +90,33 @@ export async function getMyRoutes(driverId: string): Promise<RouteRow[]> {
   });
 
   return routes.map(toRouteRow);
+}
+
+/** `driverId` here is a real `Driver.id` — distinct from the Timesheets feature's own `driverId`, which is really a `User.id`. */
+export async function isRouteAssignedToDriver(routeId: string, driverProfileId: string): Promise<boolean> {
+  const route = await prisma.route.findFirst({ where: { id: routeId, driverId: driverProfileId } });
+  return route !== null;
+}
+
+/** One query, grouped by `Driver.id`. Excludes COMPLETED and CANCELLED routes — a driver only logs time against a route still in progress. */
+export async function getAssignedRoutesByDriverProfileIds(
+  driverProfileIds: string[],
+): Promise<Record<string, AssignedRouteOption[]>> {
+  const routes = await prisma.route.findMany({
+    where: { driverId: { in: driverProfileIds }, status: { notIn: ["COMPLETED", "CANCELLED"] } },
+    orderBy: { pickupAt: "desc" },
+  });
+
+  const result: Record<string, AssignedRouteOption[]> = {};
+  for (const route of routes) {
+    const driverId = route.driverId;
+    if (!driverId) {
+      continue;
+    }
+    const label = `${route.pickupAddress} → ${route.deliveryAddress}`;
+    (result[driverId] ??= []).push({ id: route.id, routeNumber: formatRouteNumber(route.sequenceNumber), label });
+  }
+  return result;
 }
 
 export async function getRouteById(

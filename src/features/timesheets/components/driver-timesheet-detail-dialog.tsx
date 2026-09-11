@@ -2,7 +2,7 @@
 
 import { type ReactElement, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Pencil, Plus, Trash2, Truck } from "lucide-react";
+import { Trash2, Truck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -12,12 +12,10 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import type { AssignedRouteOption } from "@/features/routes/types";
 import { StatusBadge } from "@/features/timesheets/components/status-badge";
-import { TimesheetEntryDialog } from "@/features/timesheets/components/timesheet-entry-dialog";
-import {
-  deleteDailyEntryAction,
-  deleteTimesheetAction,
-} from "@/features/timesheets/actions/timesheet-actions";
+import { TimesheetDayRow } from "@/features/timesheets/components/timesheet-day-row";
+import { deleteTimesheetAction } from "@/features/timesheets/actions/timesheet-actions";
 import { getWeekDates } from "@/features/timesheets/lib/calculations";
 import type { Driver, DriverSubmissionRow } from "@/features/timesheets/types";
 
@@ -29,13 +27,8 @@ interface DriverTimesheetDetailDialogProps {
   row: DriverSubmissionRow;
   weekStart: string;
   drivers: Driver[];
+  routesByDriverId: Record<string, AssignedRouteOption[]>;
 }
-
-const dayFormatter = new Intl.DateTimeFormat("en-US", {
-  weekday: "short",
-  month: "short",
-  day: "numeric",
-});
 
 export function DriverTimesheetDetailDialog({
   trigger,
@@ -44,32 +37,18 @@ export function DriverTimesheetDetailDialog({
   row,
   weekStart,
   drivers,
+  routesByDriverId,
 }: DriverTimesheetDetailDialogProps) {
   const router = useRouter();
   const [internalOpen, setInternalOpen] = useState(false);
   const open = trigger !== undefined ? internalOpen : (controlledOpen ?? false);
   const setOpen = trigger !== undefined ? setInternalOpen : (setControlledOpen ?? (() => {}));
-  const [pendingDate, setPendingDate] = useState<string | null>(null);
   const [isDeletingTimesheet, setIsDeletingTimesheet] = useState(false);
 
   const entriesByDate = new Map(row.dailyEntries.map((entry) => [entry.date, entry]));
+  const nonDrivingByDate = new Map(row.nonDrivingDays.map((day) => [day.date, day]));
   const weekDates = getWeekDates(weekStart);
-
-  async function handleDeleteEntry(date: string) {
-    if (!window.confirm("Delete this daily entry?")) {
-      return;
-    }
-
-    setPendingDate(date);
-    try {
-      await deleteDailyEntryAction({ driverId: row.driverId, weekStart, date });
-      router.refresh();
-    } catch {
-      window.alert("Could not delete this entry. Please try again.");
-    } finally {
-      setPendingDate(null);
-    }
-  }
+  const hasAnyData = row.dailyEntries.length > 0 || row.nonDrivingDays.length > 0;
 
   async function handleDeleteTimesheet() {
     if (!window.confirm(`Delete ${row.driverName}'s entire timesheet for this week?`)) {
@@ -106,57 +85,30 @@ export function DriverTimesheetDetailDialog({
         </DialogHeader>
 
         <div className="flex flex-col divide-y divide-border rounded-lg border border-border">
-          {weekDates.map((date) => {
-            const entry = entriesByDate.get(date);
+          {weekDates.map((date) => (
+            <TimesheetDayRow
+              key={date}
+              date={date}
+              weekStart={weekStart}
+              entry={entriesByDate.get(date)}
+              nonDrivingDay={nonDrivingByDate.get(date)}
+              driverId={row.driverId}
+              drivers={drivers}
+              routesByDriverId={routesByDriverId}
+            />
+          ))}
+        </div>
 
-            return (
-              <div key={date} className="flex items-center justify-between gap-3 px-3 py-2">
-                <div>
-                  <p className="text-sm font-medium text-foreground">{dayFormatter.format(new Date(`${date}T00:00:00.000Z`))}</p>
-                  <p className="text-xs text-muted-foreground">
-                    {entry ? `${entry.startTime} – ${entry.endTime} · ${entry.hours} hrs` : "No entry"}
-                  </p>
-                </div>
-
-                <div className="flex items-center gap-1">
-                  <TimesheetEntryDialog
-                    drivers={drivers}
-                    defaultDriverId={row.driverId}
-                    lockDriver
-                    defaultDate={date}
-                    initialEntry={entry ? { date, startTime: entry.startTime, endTime: entry.endTime } : undefined}
-                    trigger={
-                      <Button
-                        variant="ghost"
-                        size="icon-sm"
-                        aria-label={entry ? `Edit entry for ${date}` : `Add entry for ${date}`}
-                      >
-                        {entry ? <Pencil className="size-3.5" /> : <Plus className="size-3.5" />}
-                      </Button>
-                    }
-                  />
-                  {entry && (
-                    <Button
-                      variant="ghost"
-                      size="icon-sm"
-                      aria-label={`Delete entry for ${date}`}
-                      disabled={pendingDate === date}
-                      onClick={() => handleDeleteEntry(date)}
-                    >
-                      <Trash2 className="size-3.5 text-destructive" />
-                    </Button>
-                  )}
-                </div>
-              </div>
-            );
-          })}
+        <div className="flex items-center justify-between rounded-lg bg-blue-50 px-4 py-3">
+          <p className="text-sm font-medium text-blue-700">Total calculated pay</p>
+          <p className="text-lg font-semibold text-blue-700">${row.totalCalculatedPay}</p>
         </div>
 
         <Button
           variant="outline"
           className="border-destructive/30 text-destructive hover:bg-destructive/10"
           onClick={handleDeleteTimesheet}
-          disabled={row.dailyEntries.length === 0 || isDeletingTimesheet}
+          disabled={!hasAnyData || isDeletingTimesheet}
         >
           <Trash2 className="size-4" aria-hidden="true" />
           {isDeletingTimesheet ? "Deleting…" : "Delete entire timesheet"}

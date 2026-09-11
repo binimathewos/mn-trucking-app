@@ -1,13 +1,15 @@
 import { Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import type { AssignedRouteOption } from "@/features/routes/types";
 import { TimesheetEntryDialog } from "@/features/timesheets/components/timesheet-entry-dialog";
 import type { Driver } from "@/features/timesheets/types";
 
 interface TimesheetsHeaderProps {
   drivers: Driver[];
+  routesByDriverId: Record<string, AssignedRouteOption[]>;
 }
 
-export function TimesheetsHeader({ drivers }: TimesheetsHeaderProps) {
+export function TimesheetsHeader({ drivers, routesByDriverId }: TimesheetsHeaderProps) {
   return (
     <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
       <div>
@@ -22,6 +24,7 @@ export function TimesheetsHeader({ drivers }: TimesheetsHeaderProps) {
 
       <TimesheetEntryDialog
         drivers={drivers}
+        routesByDriverId={routesByDriverId}
         trigger={
           <Button className="w-full sm:w-auto">
             <Plus className="size-4" aria-hidden="true" />

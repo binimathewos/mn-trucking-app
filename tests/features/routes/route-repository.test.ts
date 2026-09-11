@@ -23,6 +23,7 @@ function routeRow(overrides: Partial<Record<string, unknown>> = {}) {
     referenceNumber: "PO-1",
     notes: null,
     status: "ASSIGNED",
+    hourlyRate: 25,
     ...overrides,
   };
 }

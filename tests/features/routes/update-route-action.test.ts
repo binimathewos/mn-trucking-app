@@ -22,6 +22,7 @@ const VALID_INPUT = {
   pickupAddress: "123 A St",
   deliveryAddress: "456 B St",
   pickupAt: "2026-01-01",
+  hourlyRate: "25.00",
 };
 
 beforeEach(() => {

@@ -64,6 +64,7 @@ function EditRouteForm({
   const [deliveryAt, setDeliveryAt] = useState(toDateInputValue(route.deliveryAt));
   const [referenceNumber, setReferenceNumber] = useState(route.referenceNumber ?? "");
   const [notes, setNotes] = useState(route.notes ?? "");
+  const [hourlyRate, setHourlyRate] = useState(route.hourlyRate);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
@@ -89,6 +90,7 @@ function EditRouteForm({
         deliveryAt: deliveryAt || undefined,
         referenceNumber: referenceNumber || undefined,
         notes: notes || undefined,
+        hourlyRate,
       });
       onOpenChange(false);
       router.refresh();
@@ -196,6 +198,21 @@ function EditRouteForm({
             disabled={locked}
           />
         </label>
+
+        <label className="flex flex-col gap-1 text-sm font-medium text-foreground">
+          Driver hourly rate
+          <Input
+            value={hourlyRate}
+            onChange={(event) => setHourlyRate(event.target.value)}
+            disabled={locked}
+            aria-invalid={Boolean(fieldErrors.hourlyRate)}
+          />
+          {fieldErrors.hourlyRate && (
+            <span className="text-xs text-destructive">{fieldErrors.hourlyRate}</span>
+          )}
+        </label>
+
+        <div />
 
         <label className="flex flex-col gap-1 text-sm font-medium text-foreground sm:col-span-2">
           Notes

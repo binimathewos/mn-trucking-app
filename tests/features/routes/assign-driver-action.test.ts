@@ -70,6 +70,7 @@ describe("assignDriverAction", () => {
         referenceNumber: null,
         notes: null,
         status: "SCHEDULED",
+        hourlyRate: 25,
       },
     ] as never);
 

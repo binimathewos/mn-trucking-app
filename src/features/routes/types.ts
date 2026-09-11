@@ -24,6 +24,16 @@ export interface RouteRow {
   referenceNumber: string | null;
   notes: string | null;
   status: RouteStatus;
+  hourlyRate: string;
+}
+
+/** One of a driver's currently-assigned routes, for route-picker UI (e.g. the timesheet entry dialog). */
+export interface AssignedRouteOption {
+  id: string;
+  /** Formatted route reference, e.g. "RT-000042" (`formatRouteNumber`). Primary label in pickers. */
+  routeNumber: string;
+  /** `"${pickupAddress} → ${deliveryAddress}"`. Secondary/summary label in pickers. */
+  label: string;
 }
 
 /**

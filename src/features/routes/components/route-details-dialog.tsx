@@ -113,6 +113,7 @@ export function RouteDetailsDialog({ route, open, onOpenChange, canManage = fals
             <DetailRow label="Delivery date" value={formatDate(route.deliveryAt)} />
             <DetailRow label="Driver" value={route.driverName ?? "Unassigned"} />
             <DetailRow label="Truck" value={route.truckNumber ?? "No truck"} />
+            <DetailRow label="Driver hourly rate" value={`$${route.hourlyRate}/hr`} />
             <DetailRow label="Notes" value={route.notes ?? "—"} />
           </div>
 

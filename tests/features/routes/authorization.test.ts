@@ -138,6 +138,7 @@ function routeWithRelations(overrides: Partial<Record<string, unknown>> = {}) {
     referenceNumber: null,
     notes: null,
     status: "ASSIGNED",
+    hourlyRate: 25,
     ...overrides,
   };
 }

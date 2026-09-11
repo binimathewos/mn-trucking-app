@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { Prisma } from "@prisma/client";
 import { getSessionAccess } from "@/lib/auth/get-session-access";
 import { resolveAdminOnlyAccess } from "@/lib/auth/route-access";
 import { prisma } from "@/lib/db/prisma";
@@ -63,7 +64,7 @@ export async function createRouteAction(input: unknown): Promise<{ routeId: stri
   if (!parsed.success) {
     throw new RouteActionError("Check the form for errors.", fieldErrorsFromZod(parsed.error));
   }
-  const { clientId, pickupAddress, deliveryAddress, pickupAt, deliveryAt, driverId, referenceNumber, notes } =
+  const { clientId, pickupAddress, deliveryAddress, pickupAt, deliveryAt, driverId, referenceNumber, notes, hourlyRate } =
     parsed.data;
 
   await assertClientActive(clientId);
@@ -101,6 +102,7 @@ export async function createRouteAction(input: unknown): Promise<{ routeId: stri
       referenceNumber: referenceNumber ?? null,
       notes: notes ?? null,
       status: autoStatusForDriverPresence(Boolean(driverId)),
+      hourlyRate: new Prisma.Decimal(hourlyRate),
     },
   });
 
@@ -115,7 +117,7 @@ export async function updateRouteAction(input: unknown): Promise<void> {
   if (!parsed.success) {
     throw new RouteActionError("Check the form for errors.", fieldErrorsFromZod(parsed.error));
   }
-  const { routeId, clientId, pickupAddress, deliveryAddress, pickupAt, deliveryAt, referenceNumber, notes } =
+  const { routeId, clientId, pickupAddress, deliveryAddress, pickupAt, deliveryAt, referenceNumber, notes, hourlyRate } =
     parsed.data;
 
   await loadMutableRoute(routeId);
@@ -131,6 +133,7 @@ export async function updateRouteAction(input: unknown): Promise<void> {
       deliveryAt: deliveryAt ? new Date(deliveryAt) : null,
       referenceNumber: referenceNumber ?? null,
       notes: notes ?? null,
+      hourlyRate: new Prisma.Decimal(hourlyRate),
     },
   });
 

@@ -9,6 +9,7 @@ import {
   getTimesheetSummary,
   getWeekDates,
   getWeekStart,
+  nonDrivingDayInputSchema,
 } from "@/features/timesheets/lib/calculations";
 import type { DriverSubmissionRow } from "@/features/timesheets/types";
 
@@ -74,6 +75,27 @@ describe("deriveStatus", () => {
       ),
     ).toBe("submitted");
   });
+
+  it("counts a Not Driving day as covered, not missing", () => {
+    expect(deriveStatus(weekStart, [], [{ date: "2026-08-31" }])).toBe("draft");
+  });
+
+  it("is submitted when entries and Not Driving days together cover all 7 dates", () => {
+    const weekDates = getWeekDates(weekStart);
+    expect(
+      deriveStatus(
+        weekStart,
+        weekDates.slice(0, 5).map((date) => ({ date })),
+        weekDates.slice(5).map((date) => ({ date })),
+      ),
+    ).toBe("submitted");
+  });
+
+  it("does not double-count a date present in both entries and Not Driving days", () => {
+    expect(
+      deriveStatus(weekStart, [{ date: "2026-08-31" }], [{ date: "2026-08-31" }]),
+    ).toBe("draft");
+  });
 });
 
 describe("deriveTotalHours", () => {
@@ -123,7 +145,12 @@ describe("getTimesheetSummary", () => {
         hoursLogged: 16,
         lastSubmittedAt: "2026-09-01T10:00:00.000Z",
         status: "submitted",
-        dailyEntries: [{ date: "2026-08-31", startTime: "07:00", endTime: "15:00", hours: 8, savedAt: "2026-08-31T10:00:00.000Z" }, { date: "2026-09-01", startTime: "07:00", endTime: "15:00", hours: 8, savedAt: "2026-09-01T10:00:00.000Z" }],
+        dailyEntries: [
+          { date: "2026-08-31", startTime: "07:00", endTime: "15:00", hours: 8, savedAt: "2026-08-31T10:00:00.000Z", routeId: null, routeLabel: null, hourlyRate: null, calculatedPay: null },
+          { date: "2026-09-01", startTime: "07:00", endTime: "15:00", hours: 8, savedAt: "2026-09-01T10:00:00.000Z", routeId: null, routeLabel: null, hourlyRate: null, calculatedPay: null },
+        ],
+        nonDrivingDays: [],
+        totalCalculatedPay: "0.00",
       },
       {
         driverId: "2",
@@ -133,7 +160,11 @@ describe("getTimesheetSummary", () => {
         hoursLogged: 4,
         lastSubmittedAt: "2026-08-31T09:00:00.000Z",
         status: "draft",
-        dailyEntries: [{ date: "2026-08-31", startTime: "07:00", endTime: "11:00", hours: 4, savedAt: "2026-08-31T09:00:00.000Z" }],
+        dailyEntries: [
+          { date: "2026-08-31", startTime: "07:00", endTime: "11:00", hours: 4, savedAt: "2026-08-31T09:00:00.000Z", routeId: null, routeLabel: null, hourlyRate: null, calculatedPay: null },
+        ],
+        nonDrivingDays: [],
+        totalCalculatedPay: "0.00",
       },
       {
         driverId: "3",
@@ -144,6 +175,8 @@ describe("getTimesheetSummary", () => {
         lastSubmittedAt: null,
         status: "not_submitted",
         dailyEntries: [],
+        nonDrivingDays: [],
+        totalCalculatedPay: "0.00",
       },
     ];
 
@@ -172,10 +205,17 @@ describe("dailyEntryInputSchema", () => {
     date: "2026-09-02",
     startTime: "07:00",
     endTime: "15:30",
+    routeId: "route_1",
   };
 
   it("accepts a valid entry", () => {
     expect(dailyEntryInputSchema.safeParse(valid).success).toBe(true);
+  });
+
+  it("rejects a missing routeId", () => {
+    const withoutRoute: Partial<typeof valid> = { ...valid };
+    delete withoutRoute.routeId;
+    expect(dailyEntryInputSchema.safeParse(withoutRoute).success).toBe(false);
   });
 
   it("rejects a date outside the target week", () => {
@@ -198,5 +238,28 @@ describe("dailyEntryInputSchema", () => {
     expect(
       dailyEntryInputSchema.safeParse({ ...valid, startTime: "7am", endTime: "15:30" }).success,
     ).toBe(false);
+  });
+});
+
+describe("nonDrivingDayInputSchema", () => {
+  const valid = {
+    driverId: "user_1",
+    weekStart: "2026-08-31",
+    date: "2026-09-02",
+    reason: "DAY_OFF",
+  };
+
+  it("accepts a valid Not Driving day for each reason", () => {
+    for (const reason of ["NO_JOB", "DAY_OFF", "OTHER"]) {
+      expect(nonDrivingDayInputSchema.safeParse({ ...valid, reason }).success).toBe(true);
+    }
+  });
+
+  it("rejects an unknown reason", () => {
+    expect(nonDrivingDayInputSchema.safeParse({ ...valid, reason: "VACATION" }).success).toBe(false);
+  });
+
+  it("rejects a date outside the target week", () => {
+    expect(nonDrivingDayInputSchema.safeParse({ ...valid, date: "2026-09-10" }).success).toBe(false);
   });
 });

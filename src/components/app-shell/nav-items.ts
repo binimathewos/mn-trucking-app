@@ -28,7 +28,7 @@ export const navItems: NavItem[] = [
     label: "Timesheets",
     href: "/timesheets",
     icon: Clock,
-    roles: ["administrator"],
+    roles: ["administrator", "driver"],
   },
   {
     label: "Containers",

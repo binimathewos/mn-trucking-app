@@ -20,6 +20,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import type { AssignedRouteOption } from "@/features/routes/types";
 import { computeHoursFromTimeRange, getWeekStart } from "@/features/timesheets/lib/calculations";
 import { saveDailyEntryAction } from "@/features/timesheets/actions/timesheet-actions";
 import type { Driver } from "@/features/timesheets/types";
@@ -30,10 +31,11 @@ interface TimesheetEntryDialogProps {
   open?: boolean;
   onOpenChange?: (open: boolean) => void;
   drivers: Driver[];
+  routesByDriverId: Record<string, AssignedRouteOption[]>;
   defaultDriverId?: string;
   defaultDate?: string;
   lockDriver?: boolean;
-  initialEntry?: { date: string; startTime: string; endTime: string };
+  initialEntry?: { date: string; startTime: string; endTime: string; routeId?: string | null };
 }
 
 function todayIso(): string {
@@ -45,6 +47,7 @@ export function TimesheetEntryDialog({
   open: controlledOpen,
   onOpenChange: setControlledOpen,
   drivers,
+  routesByDriverId,
   defaultDriverId,
   defaultDate,
   lockDriver = false,
@@ -58,6 +61,7 @@ export function TimesheetEntryDialog({
   const [date, setDate] = useState(initialEntry?.date ?? defaultDate ?? todayIso());
   const [startTime, setStartTime] = useState(initialEntry?.startTime ?? "07:00");
   const [endTime, setEndTime] = useState(initialEntry?.endTime ?? "15:30");
+  const [routeId, setRouteId] = useState(initialEntry?.routeId ?? "");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -66,6 +70,12 @@ export function TimesheetEntryDialog({
   const driverItems: Record<string, string> = Object.fromEntries(
     drivers.map((driver) => [driver.id, driver.name]),
   );
+
+  const availableRoutes = routesByDriverId[driverId] ?? [];
+  const routeItems: Record<string, string> = Object.fromEntries(
+    availableRoutes.map((route) => [route.id, route.routeNumber]),
+  );
+  const selectedRoute = availableRoutes.find((route) => route.id === routeId) ?? null;
 
   const totalHours = useMemo(() => {
     const hours = computeHoursFromTimeRange(startTime, endTime);
@@ -77,7 +87,13 @@ export function TimesheetEntryDialog({
     setDate(initialEntry?.date ?? defaultDate ?? todayIso());
     setStartTime(initialEntry?.startTime ?? "07:00");
     setEndTime(initialEntry?.endTime ?? "15:30");
+    setRouteId(initialEntry?.routeId ?? "");
     setError(null);
+  }
+
+  function handleDriverChange(nextDriverId: string) {
+    setDriverId(nextDriverId);
+    setRouteId("");
   }
 
   async function handleSubmit() {
@@ -91,6 +107,7 @@ export function TimesheetEntryDialog({
         date,
         startTime,
         endTime,
+        routeId,
       });
       setOpen(false);
       router.refresh();
@@ -136,7 +153,7 @@ export function TimesheetEntryDialog({
             <Select
               items={driverItems}
               value={driverId}
-              onValueChange={(value) => setDriverId(value ?? "")}
+              onValueChange={(value) => handleDriverChange(value ?? "")}
               disabled={lockDriver}
             >
               <SelectTrigger className="w-full">
@@ -167,6 +184,34 @@ export function TimesheetEntryDialog({
               onChange={(event) => setEndTime(event.target.value)}
             />
           </label>
+          <label className="flex flex-col gap-1 text-sm font-medium text-foreground sm:col-span-2">
+            Route
+            <Select
+              items={routeItems}
+              value={routeId}
+              onValueChange={(value) => setRouteId(value ?? "")}
+              disabled={availableRoutes.length === 0}
+            >
+              <SelectTrigger className="w-full">
+                <SelectValue
+                  placeholder={availableRoutes.length === 0 ? "No routes assigned" : "Select route"}
+                />
+              </SelectTrigger>
+              <SelectContent>
+                {availableRoutes.map((route) => (
+                  <SelectItem key={route.id} value={route.id}>
+                    <span className="flex flex-col gap-0.5 py-0.5 whitespace-normal">
+                      <span className="font-medium text-foreground">{route.routeNumber}</span>
+                      <span className="text-xs text-muted-foreground">{route.label}</span>
+                    </span>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {selectedRoute && (
+              <span className="text-xs text-muted-foreground">{selectedRoute.label}</span>
+            )}
+          </label>
         </div>
 
         <div className="flex items-center gap-3 rounded-lg bg-blue-50 px-4 py-3">
@@ -180,7 +225,11 @@ export function TimesheetEntryDialog({
         {error && <p className="text-sm text-destructive">{error}</p>}
 
         <DialogFooter>
-          <Button onClick={handleSubmit} disabled={isSubmitting || !driverId} className="w-full sm:w-auto">
+          <Button
+            onClick={handleSubmit}
+            disabled={isSubmitting || !driverId || !routeId}
+            className="w-full sm:w-auto"
+          >
             {isSubmitting ? "Saving…" : "Save timesheet"}
           </Button>
         </DialogFooter>

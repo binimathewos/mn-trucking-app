@@ -18,10 +18,10 @@ describe("getNavItemsForRole", () => {
     ]);
   });
 
-  it("returns only Dashboard for a driver", () => {
+  it("returns Dashboard and Timesheets for a driver", () => {
     const labels = getNavItemsForRole("driver").map((item) => item.label);
 
-    expect(labels).toEqual(["Dashboard"]);
+    expect(labels).toEqual(["Dashboard", "Timesheets"]);
   });
 
   it("fails closed to the driver navigation for an unrecognized or missing role", () => {

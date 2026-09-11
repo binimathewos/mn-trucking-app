@@ -1,5 +1,11 @@
 import { z } from "zod";
-import type { DriverSubmissionRow, TimesheetSummary, TimesheetStatus } from "@/features/timesheets/types";
+import { Prisma } from "@prisma/client";
+import type {
+  DriverSubmissionRow,
+  NonDrivingReason,
+  TimesheetSummary,
+  TimesheetStatus,
+} from "@/features/timesheets/types";
 
 const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 const TIME_RE = /^([01]\d|2[0-3]):[0-5]\d$/;
@@ -36,14 +42,21 @@ export function computeHoursFromTimeRange(startTime: string, endTime: string): n
   return Math.round((minutes / 60) * 100) / 100;
 }
 
-/** Not Submitted (0 days) → Draft (1-6 days) → Submitted (all 7 days), per spec Clarifications. */
+/**
+ * Not Submitted (0 days) → Draft (1-6 days) → Submitted (all 7 days), per spec
+ * Clarifications. A day intentionally marked Not Driving counts as covered —
+ * it's a resolved day, not a missing one.
+ */
 export function deriveStatus(
   weekStart: string,
   entries: { date: string }[],
+  nonDrivingDays: { date: string }[] = [],
 ): TimesheetStatus {
   const weekDates = new Set(getWeekDates(weekStart));
   const coveredCount = new Set(
-    entries.map((entry) => entry.date).filter((date) => weekDates.has(date)),
+    [...entries, ...nonDrivingDays]
+      .map((item) => item.date)
+      .filter((date) => weekDates.has(date)),
   ).size;
 
   if (coveredCount === 0) {
@@ -78,6 +91,22 @@ export function computeAverageDailyHours(entries: { hours: number }[]): number {
   return deriveTotalHours(entries) / entries.length;
 }
 
+/** `hours × hourlyRate`, formatted to 2 decimal places. `null` when there's no route/rate to apply (FR-021). */
+export function computeCalculatedPay(hours: number, hourlyRate: string | null): string | null {
+  if (hourlyRate === null) {
+    return null;
+  }
+
+  return new Prisma.Decimal(hours).mul(hourlyRate).toFixed(2);
+}
+
+/** Sum of non-null `calculatedPay` values across a timesheet's entries, formatted to 2 decimal places. */
+export function computeTotalCalculatedPay(entries: { calculatedPay: string | null }[]): string {
+  return entries
+    .reduce((total, entry) => (entry.calculatedPay ? total.add(entry.calculatedPay) : total), new Prisma.Decimal(0))
+    .toFixed(2);
+}
+
 export function getTimesheetSummary(rows: DriverSubmissionRow[]): TimesheetSummary {
   const allEntries = rows.flatMap((row) => row.dailyEntries);
 
@@ -96,6 +125,7 @@ export const dailyEntryInputSchema = z
     date: z.string().regex(ISO_DATE_RE, "date must be an ISO date (yyyy-mm-dd)"),
     startTime: z.string().regex(TIME_RE, "startTime must be a 24-hour HH:mm time"),
     endTime: z.string().regex(TIME_RE, "endTime must be a 24-hour HH:mm time"),
+    routeId: z.string().min(1, "Select a route."),
   })
   .refine((data) => getWeekDates(data.weekStart).includes(data.date), {
     message: "date must fall within the target week",
@@ -107,3 +137,25 @@ export const dailyEntryInputSchema = z
   });
 
 export type DailyEntryInput = z.infer<typeof dailyEntryInputSchema>;
+
+export const NON_DRIVING_REASONS = ["NO_JOB", "DAY_OFF", "OTHER"] as const satisfies readonly NonDrivingReason[];
+
+export const NON_DRIVING_REASON_LABELS: Record<NonDrivingReason, string> = {
+  NO_JOB: "No Job / No Route",
+  DAY_OFF: "Day Off",
+  OTHER: "Other",
+};
+
+export const nonDrivingDayInputSchema = z
+  .object({
+    driverId: z.string().min(1),
+    weekStart: z.string().regex(ISO_DATE_RE, "weekStart must be an ISO date (yyyy-mm-dd)"),
+    date: z.string().regex(ISO_DATE_RE, "date must be an ISO date (yyyy-mm-dd)"),
+    reason: z.enum(NON_DRIVING_REASONS),
+  })
+  .refine((data) => getWeekDates(data.weekStart).includes(data.date), {
+    message: "date must fall within the target week",
+    path: ["date"],
+  });
+
+export type NonDrivingDayInput = z.infer<typeof nonDrivingDayInputSchema>;

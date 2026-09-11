@@ -31,6 +31,7 @@ interface CreateRouteDialogProps {
   trigger: ReactElement;
   activeClients: { id: string; companyName: string }[];
   activeDrivers: { id: string; name: string }[];
+  defaultHourlyRate: string;
   onSuccess?: () => void;
 }
 
@@ -38,6 +39,7 @@ export function CreateRouteDialog({
   trigger,
   activeClients,
   activeDrivers,
+  defaultHourlyRate,
   onSuccess,
 }: CreateRouteDialogProps) {
   const router = useRouter();
@@ -51,6 +53,7 @@ export function CreateRouteDialog({
   const [deliveryAt, setDeliveryAt] = useState("");
   const [referenceNumber, setReferenceNumber] = useState("");
   const [notes, setNotes] = useState("");
+  const [hourlyRate, setHourlyRate] = useState(defaultHourlyRate);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
@@ -73,6 +76,7 @@ export function CreateRouteDialog({
     setDeliveryAt("");
     setReferenceNumber("");
     setNotes("");
+    setHourlyRate(defaultHourlyRate);
     setFormError(null);
     setFieldErrors({});
   }
@@ -92,6 +96,7 @@ export function CreateRouteDialog({
         driverId: driverId === NO_DRIVER_VALUE ? undefined : driverId,
         referenceNumber: referenceNumber || undefined,
         notes: notes || undefined,
+        hourlyRate,
       });
       setOpen(false);
       resetForm();
@@ -106,7 +111,8 @@ export function CreateRouteDialog({
     }
   }
 
-  const canSubmit = clientId && pickupAddress.trim() && deliveryAddress.trim() && pickupAt;
+  const canSubmit =
+    clientId && pickupAddress.trim() && deliveryAddress.trim() && pickupAt && hourlyRate.trim();
 
   return (
     <Dialog
@@ -244,6 +250,19 @@ export function CreateRouteDialog({
               value={deliveryAt}
               onChange={(event) => setDeliveryAt(event.target.value)}
             />
+          </label>
+
+          <label className="flex flex-col gap-1 text-sm font-medium text-foreground">
+            Driver hourly rate
+            <Input
+              value={hourlyRate}
+              onChange={(event) => setHourlyRate(event.target.value)}
+              placeholder="22.00"
+              aria-invalid={Boolean(fieldErrors.hourlyRate)}
+            />
+            {fieldErrors.hourlyRate && (
+              <span className="text-xs text-destructive">{fieldErrors.hourlyRate}</span>
+            )}
           </label>
 
           <label className="flex flex-col gap-1 text-sm font-medium text-foreground sm:col-span-2">

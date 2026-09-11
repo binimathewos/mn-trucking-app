@@ -9,9 +9,10 @@ import { CreateRouteDialog } from "@/features/routes/components/create-route-dia
 interface RoutesHeaderProps {
   activeClients: { id: string; companyName: string }[];
   activeDrivers: { id: string; name: string }[];
+  defaultHourlyRate: string;
 }
 
-export function RoutesHeader({ activeClients, activeDrivers }: RoutesHeaderProps) {
+export function RoutesHeader({ activeClients, activeDrivers, defaultHourlyRate }: RoutesHeaderProps) {
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
   useEffect(() => {
@@ -35,7 +36,12 @@ export function RoutesHeader({ activeClients, activeDrivers }: RoutesHeaderProps
       </div>
 
       <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
-        <Button variant="outline" render={<Link href="/clients" />} className="w-full sm:w-auto">
+        <Button
+          variant="outline"
+          render={<Link href="/clients" />}
+          nativeButton={false}
+          className="w-full sm:w-auto"
+        >
           <Users className="size-4" aria-hidden="true" />
           Manage clients
         </Button>
@@ -43,6 +49,7 @@ export function RoutesHeader({ activeClients, activeDrivers }: RoutesHeaderProps
         <CreateRouteDialog
           activeClients={activeClients}
           activeDrivers={activeDrivers}
+          defaultHourlyRate={defaultHourlyRate}
           trigger={
             <Button className="w-full sm:w-auto">
               <Plus className="size-4" aria-hidden="true" />

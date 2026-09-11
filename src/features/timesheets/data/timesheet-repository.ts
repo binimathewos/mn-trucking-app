@@ -1,6 +1,8 @@
 import { prisma } from "@/lib/db/prisma";
 import {
+  computeCalculatedPay,
   computeHoursFromTimeRange,
+  computeTotalCalculatedPay,
   deriveLastSubmittedAt,
   deriveStatus,
   deriveTotalHours,
@@ -10,6 +12,8 @@ import type {
   DailyEntry,
   Driver,
   DriverSubmissionRow,
+  NonDrivingDayInfo,
+  NonDrivingReason,
   WeekOption,
 } from "@/features/timesheets/types";
 
@@ -78,6 +82,7 @@ export async function getTeamDirectory(): Promise<Driver[]> {
     name: user.name,
     roleType: toRoleType(user),
     truckNumber: toTruckNumber(user),
+    driverProfileId: user.driver?.id ?? null,
   }));
 }
 
@@ -92,7 +97,7 @@ export async function getDriverSubmissions(
       driver: true,
       timesheets: {
         where: { weekStart: toDateOnly(weekStart) },
-        include: { entries: true },
+        include: { entries: { include: { route: true } }, nonDrivingDays: true },
       },
     },
     orderBy: { name: "asc" },
@@ -101,12 +106,27 @@ export async function getDriverSubmissions(
   return users.map((user) => {
     const entries = user.timesheets[0]?.entries ?? [];
     const dailyEntries: DailyEntry[] = entries
-      .map((entry) => ({
-        date: toIsoDate(entry.date),
-        startTime: entry.startTime,
-        endTime: entry.endTime,
-        hours: entry.hours,
-        savedAt: entry.savedAt.toISOString(),
+      .map((entry) => {
+        const hourlyRate = entry.route ? entry.route.hourlyRate.toFixed(2) : null;
+        return {
+          date: toIsoDate(entry.date),
+          startTime: entry.startTime,
+          endTime: entry.endTime,
+          hours: entry.hours,
+          savedAt: entry.savedAt.toISOString(),
+          routeId: entry.routeId,
+          routeLabel: entry.route ? `${entry.route.pickupAddress} → ${entry.route.deliveryAddress}` : null,
+          hourlyRate,
+          calculatedPay: computeCalculatedPay(entry.hours, hourlyRate),
+        };
+      })
+      .sort((a, b) => a.date.localeCompare(b.date));
+
+    const nonDrivingDays: NonDrivingDayInfo[] = (user.timesheets[0]?.nonDrivingDays ?? [])
+      .map((day) => ({
+        date: toIsoDate(day.date),
+        reason: day.reason as NonDrivingReason,
+        savedAt: day.savedAt.toISOString(),
       }))
       .sort((a, b) => a.date.localeCompare(b.date));
 
@@ -117,8 +137,10 @@ export async function getDriverSubmissions(
       truckNumber: toTruckNumber(user),
       hoursLogged: deriveTotalHours(dailyEntries),
       lastSubmittedAt: deriveLastSubmittedAt(dailyEntries),
-      status: deriveStatus(weekStart, dailyEntries),
+      status: deriveStatus(weekStart, dailyEntries, nonDrivingDays),
       dailyEntries,
+      nonDrivingDays,
+      totalCalculatedPay: computeTotalCalculatedPay(dailyEntries),
     };
   });
 }
@@ -129,11 +151,17 @@ interface DailyEntryWriteInput {
   date: string;
   startTime: string;
   endTime: string;
+  routeId: string;
 }
 
-/** Creates the parent Timesheet if needed, then creates or replaces the entry for `date`. */
+/**
+ * Creates the parent Timesheet if needed, then creates or replaces the entry
+ * for `date`. Clears any Not Driving status on that date first — a day can
+ * never carry both a logged entry and a Not Driving status at once.
+ */
 export async function upsertDailyEntry(input: DailyEntryWriteInput): Promise<void> {
   const weekStart = toDateOnly(input.weekStart);
+  const date = toDateOnly(input.date);
 
   const timesheet = await prisma.timesheet.upsert({
     where: { userId_weekStart: { userId: input.driverId, weekStart } },
@@ -141,20 +169,24 @@ export async function upsertDailyEntry(input: DailyEntryWriteInput): Promise<voi
     create: { userId: input.driverId, weekStart },
   });
 
+  await prisma.nonDrivingDay.deleteMany({ where: { timesheetId: timesheet.id, date } });
+
   await prisma.timesheetEntry.upsert({
-    where: { timesheetId_date: { timesheetId: timesheet.id, date: toDateOnly(input.date) } },
+    where: { timesheetId_date: { timesheetId: timesheet.id, date } },
     update: {
       startTime: input.startTime,
       endTime: input.endTime,
       hours: computeHoursFromTimeRange(input.startTime, input.endTime),
+      routeId: input.routeId,
       savedAt: new Date(),
     },
     create: {
       timesheetId: timesheet.id,
-      date: toDateOnly(input.date),
+      date,
       startTime: input.startTime,
       endTime: input.endTime,
       hours: computeHoursFromTimeRange(input.startTime, input.endTime),
+      routeId: input.routeId,
     },
   });
 }
@@ -176,6 +208,52 @@ export async function deleteDailyEntry(input: DailyEntryDeleteInput): Promise<vo
   }
 
   await prisma.timesheetEntry.deleteMany({
+    where: { timesheetId: timesheet.id, date: toDateOnly(input.date) },
+  });
+}
+
+interface NonDrivingDayWriteInput {
+  driverId: string;
+  weekStart: string;
+  date: string;
+  reason: NonDrivingReason;
+}
+
+/**
+ * Creates the parent Timesheet if needed, then marks `date` as Not Driving
+ * with `reason`. Clears any logged entry on that date first — a day can
+ * never carry both a logged entry and a Not Driving status at once.
+ */
+export async function upsertNonDrivingDay(input: NonDrivingDayWriteInput): Promise<void> {
+  const weekStart = toDateOnly(input.weekStart);
+  const date = toDateOnly(input.date);
+
+  const timesheet = await prisma.timesheet.upsert({
+    where: { userId_weekStart: { userId: input.driverId, weekStart } },
+    update: {},
+    create: { userId: input.driverId, weekStart },
+  });
+
+  await prisma.timesheetEntry.deleteMany({ where: { timesheetId: timesheet.id, date } });
+
+  await prisma.nonDrivingDay.upsert({
+    where: { timesheetId_date: { timesheetId: timesheet.id, date } },
+    update: { reason: input.reason, savedAt: new Date() },
+    create: { timesheetId: timesheet.id, date, reason: input.reason },
+  });
+}
+
+/** Undoes a Not Driving status. No-op if no matching timesheet or record exists. */
+export async function deleteNonDrivingDay(input: DailyEntryDeleteInput): Promise<void> {
+  const timesheet = await prisma.timesheet.findUnique({
+    where: { userId_weekStart: { userId: input.driverId, weekStart: toDateOnly(input.weekStart) } },
+  });
+
+  if (!timesheet) {
+    return;
+  }
+
+  await prisma.nonDrivingDay.deleteMany({
     where: { timesheetId: timesheet.id, date: toDateOnly(input.date) },
   });
 }

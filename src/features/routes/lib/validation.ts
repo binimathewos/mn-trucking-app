@@ -17,6 +17,10 @@ const optionalTextSchema = z
   .optional()
   .or(z.literal("").transform(() => undefined));
 
+const hourlyRateSchema = z
+  .string()
+  .regex(/^\d+(\.\d{1,2})?$/, "Enter a valid, non-negative rate with up to 2 decimal places.");
+
 export const createRouteInputSchema = z.object({
   clientId: z.string().min(1, "Select a client."),
   pickupAddress: z.string().trim().min(1, "Pickup address is required."),
@@ -26,6 +30,7 @@ export const createRouteInputSchema = z.object({
   driverId: optionalTextSchema,
   referenceNumber: optionalTextSchema,
   notes: optionalTextSchema,
+  hourlyRate: hourlyRateSchema,
 });
 
 export type CreateRouteInput = z.infer<typeof createRouteInputSchema>;
@@ -39,6 +44,7 @@ export const updateRouteInputSchema = z.object({
   deliveryAt: optionalDateOnlySchema,
   referenceNumber: optionalTextSchema,
   notes: optionalTextSchema,
+  hourlyRate: hourlyRateSchema,
 });
 
 export type UpdateRouteInput = z.infer<typeof updateRouteInputSchema>;

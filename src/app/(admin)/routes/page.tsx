@@ -9,6 +9,7 @@ import { RouteFiltersBar } from "@/features/routes/components/route-filters-bar"
 import { RoutesHeader } from "@/features/routes/components/routes-header";
 import { RoutesTable } from "@/features/routes/components/routes-table";
 import { getMyRoutes, getRouteDirectory } from "@/features/routes/data/route-repository";
+import { getDriverPaySettings } from "@/features/settings/data/driver-pay-settings-repository";
 
 interface RoutesPageProps {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
@@ -67,11 +68,12 @@ export default async function RoutesPage({ searchParams }: RoutesPageProps) {
   });
   const filters = parsedParams.success ? parsedParams.data : {};
 
-  const [routes, allRoutes, activeClients, activeDrivers] = await Promise.all([
+  const [routes, allRoutes, activeClients, activeDrivers, driverPaySettings] = await Promise.all([
     getRouteDirectory(filters),
     getRouteDirectory(),
     getActiveClients(),
     getActiveDriversForSelect(),
+    getDriverPaySettings(),
   ]);
 
   const hasActiveFilters = Boolean(
@@ -80,7 +82,11 @@ export default async function RoutesPage({ searchParams }: RoutesPageProps) {
 
   return (
     <div className="flex flex-col gap-6 p-4 md:p-8">
-      <RoutesHeader activeClients={activeClients} activeDrivers={activeDrivers} />
+      <RoutesHeader
+        activeClients={activeClients}
+        activeDrivers={activeDrivers}
+        defaultHourlyRate={driverPaySettings.defaultHourlyRate}
+      />
 
       <Card>
         <CardContent className="flex flex-col gap-4">

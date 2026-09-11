@@ -54,5 +54,6 @@ export async function findConflictingRoute(
     referenceNumber: conflict.referenceNumber,
     notes: conflict.notes,
     status: conflict.status,
+    hourlyRate: conflict.hourlyRate.toFixed(2),
   };
 }

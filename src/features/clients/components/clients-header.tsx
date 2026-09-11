@@ -23,6 +23,7 @@ export function ClientsHeader() {
         variant="ghost"
         size="sm"
         render={<Link href="/routes" />}
+        nativeButton={false}
         className="w-fit -ml-2.5 text-muted-foreground hover:text-foreground"
       >
         <ArrowLeft className="size-4" aria-hidden="true" />

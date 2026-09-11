@@ -6,6 +6,7 @@ const VALID_CREATE_INPUT = {
   pickupAddress: "123 A St",
   deliveryAddress: "456 B St",
   pickupAt: "2026-01-01",
+  hourlyRate: "22.00",
 };
 
 describe("createRouteInputSchema", () => {
@@ -38,6 +39,32 @@ describe("createRouteInputSchema", () => {
     const input: Partial<typeof VALID_CREATE_INPUT> = { ...VALID_CREATE_INPUT };
     delete input.pickupAt;
     expect(createRouteInputSchema.safeParse(input).success).toBe(false);
+  });
+
+  it("accepts a whole-dollar hourlyRate", () => {
+    expect(createRouteInputSchema.safeParse({ ...VALID_CREATE_INPUT, hourlyRate: "22.00" }).success).toBe(true);
+  });
+
+  it("accepts a zero hourlyRate", () => {
+    expect(createRouteInputSchema.safeParse({ ...VALID_CREATE_INPUT, hourlyRate: "0" }).success).toBe(true);
+  });
+
+  it("rejects a missing hourlyRate", () => {
+    const input: Partial<typeof VALID_CREATE_INPUT> = { ...VALID_CREATE_INPUT };
+    delete input.hourlyRate;
+    expect(createRouteInputSchema.safeParse(input).success).toBe(false);
+  });
+
+  it("rejects a negative hourlyRate", () => {
+    expect(createRouteInputSchema.safeParse({ ...VALID_CREATE_INPUT, hourlyRate: "-5" }).success).toBe(false);
+  });
+
+  it("rejects a non-numeric hourlyRate", () => {
+    expect(createRouteInputSchema.safeParse({ ...VALID_CREATE_INPUT, hourlyRate: "abc" }).success).toBe(false);
+  });
+
+  it("rejects an hourlyRate with more than 2 decimal places", () => {
+    expect(createRouteInputSchema.safeParse({ ...VALID_CREATE_INPUT, hourlyRate: "22.123" }).success).toBe(false);
   });
 });
 
